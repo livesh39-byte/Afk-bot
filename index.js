@@ -48,7 +48,7 @@ app.listen(PORT, '0.0.0.0', () => {
 
 // AFK Movement Behavior
 function startAfkActions() {
-  stopAfkActions(); // Clear existing intervals if any
+  stopAfkActions();
 
   console.log('[AFK] Starting movement and jump routines...');
 
@@ -59,10 +59,8 @@ function startAfkActions() {
     const controlStates = ['forward', 'back', 'left', 'right'];
     const selectedState = controlStates[Math.floor(Math.random() * controlStates.length)];
 
-    // Reset all movement states first
     controlStates.forEach(state => bot.setControlState(state, false));
 
-    // Enable chosen movement for 1 second
     bot.setControlState(selectedState, true);
     setTimeout(() => {
       if (bot && isConnected) {
@@ -91,6 +89,19 @@ function stopAfkActions() {
   jumpInterval = null;
 }
 
+// Function to send AuthMe commands instantly
+function performAuth() {
+  if (!bot) return;
+
+  if (AUTHME_PASSWORD) {
+    console.log('[AuthMe] Attempting instant login...');
+    bot.chat(`/login ${AUTHME_PASSWORD}`);
+  } else if (AUTHME_REGISTER_PASSWORD) {
+    console.log('[AuthMe] Attempting instant registration...');
+    bot.chat(`/register ${AUTHME_REGISTER_PASSWORD} ${AUTHME_REGISTER_PASSWORD}`);
+  }
+}
+
 // Bot Creation and Reconnection Logic
 function createBot() {
   if (isConnecting || isConnected) return;
@@ -102,10 +113,11 @@ function createBot() {
     host: MC_HOST,
     port: MC_PORT,
     username: BOT_USERNAME,
-    version: MC_VERSION,
-    auth: 'offline' // Offline mode authentication for cracked/custom servers
+    version: MC_VERSION === 'false' ? false : MC_VERSION,
+    auth: 'offline'
   });
 
+  // Execute auth immediately upon spawn
   bot.once('spawn', () => {
     isConnecting = false;
     isConnected = true;
@@ -113,28 +125,28 @@ function createBot() {
     lastError = null;
     console.log(`[Bot] Successfully spawned in server ${MC_HOST}:${MC_PORT}!`);
 
+    // Perform login instantly on spawn to prevent timeout
+    setTimeout(() => performAuth(), 1000);
+
     startAfkActions();
   });
 
-  // Handle AuthMe login/register prompts
-  bot.on('messagestr', (message) => {
+  // Handle Chat Prompts as Backup
+  bot.on('message', (jsonMsg) => {
+    const message = jsonMsg.toString();
     console.log(`[Chat] ${message}`);
 
     const msgLower = message.toLowerCase();
 
     if (msgLower.includes('/login')) {
       if (AUTHME_PASSWORD) {
-        console.log('[AuthMe] Login prompt detected. Sending /login command...');
+        console.log('[AuthMe] Login prompt detected in chat. Sending /login...');
         bot.chat(`/login ${AUTHME_PASSWORD}`);
-      } else {
-        console.warn('[AuthMe] Login prompt received but AUTHME_PASSWORD is not configured!');
       }
     } else if (msgLower.includes('/register')) {
       if (AUTHME_REGISTER_PASSWORD) {
-        console.log('[AuthMe] Register prompt detected. Sending /register command...');
+        console.log('[AuthMe] Register prompt detected in chat. Sending /register...');
         bot.chat(`/register ${AUTHME_REGISTER_PASSWORD} ${AUTHME_REGISTER_PASSWORD}`);
-      } else {
-        console.warn('[AuthMe] Register prompt received but AUTHME_REGISTER_PASSWORD is not configured!');
       }
     }
   });
@@ -163,7 +175,6 @@ function scheduleReconnect() {
   if (reconnectTimer) clearTimeout(reconnectTimer);
 
   reconnectAttempts++;
-  // Exponential backoff up to a maximum delay of 60 seconds (60000 ms)
   const delay = Math.min(BASE_RETRY_MS * Math.pow(1.2, reconnectAttempts - 1), 60000);
 
   console.log(`[Reconnect] Attempting reconnect #${reconnectAttempts} in ${Math.round(delay / 1000)} seconds...`);
