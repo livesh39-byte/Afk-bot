@@ -1,0 +1,16 @@
+{
+  "name": "blastmc-afk-bot",
+  "version": "1.0.0",
+  "description": "24/7 Minecraft AFK Bot for BlastMC with AuthMe and Health Check Server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mineflayer": "^4.20.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
